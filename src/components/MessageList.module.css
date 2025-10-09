@@ -1,0 +1,67 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.message {
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  background-color: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
+  backdrop-filter: blur(12px);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.message:hover {
+  border-color: rgba(94, 234, 212, 0.6);
+  transform: translateY(-1px);
+}
+
+.meta {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(148, 163, 184, 0.8);
+}
+
+.content {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: rgba(226, 232, 240, 0.95);
+  white-space: pre-wrap;
+}
+
+.role {
+  font-weight: 600;
+}
+
+.time {
+  font-variant-numeric: tabular-nums;
+}
+
+.user {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(59, 130, 246, 0.25));
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.agent {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(59, 130, 246, 0.2));
+  border-color: rgba(249, 115, 22, 0.4);
+}
+
+.system,
+.status {
+  background: rgba(15, 23, 42, 0.75);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: rgba(203, 213, 225, 0.95);
+  font-style: italic;
+}

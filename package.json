@@ -1,0 +1,31 @@
+{
+  "name": "browser-server-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^14.2.1",
+    "@testing-library/user-event": "^14.5.2",
+  "@types/node": "^22.7.4",
+  "@types/react": "^18.2.48",
+  "@types/react-dom": "^18.2.18",
+    "@vitejs/plugin-react-swc": "^3.7.1",
+    "jsdom": "^24.0.0",
+    "postcss": "^8.4.41",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.3"
+  }
+}

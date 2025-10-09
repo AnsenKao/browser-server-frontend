@@ -1,0 +1,84 @@
+.app {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(380px, 480px) 1fr;
+  gap: 1.25rem;
+  padding: 1.5rem;
+}
+
+.chatPane {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 1rem;
+  background: rgba(15, 23, 42, 0.55);
+  border-radius: 1.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  backdrop-filter: blur(16px);
+  overflow: hidden;
+}
+
+.chatHeader {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.chatHeader h1 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+.chatHeader p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.messagesWrapper {
+  overflow: hidden;
+}
+
+.previewPane {
+  background: rgba(15, 23, 42, 0.55);
+  border-radius: 1.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  backdrop-filter: blur(16px);
+  padding: 1rem;
+  display: flex;
+}
+
+.statusBar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.statusDot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
+}
+
+.statusDotActive {
+  background: #22c55e;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.45);
+}
+
+@media (max-width: 1080px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    height: auto;
+  }
+
+  .previewPane {
+    min-height: 360px;
+  }
+}
