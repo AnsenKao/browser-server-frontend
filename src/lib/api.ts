@@ -93,6 +93,13 @@ export const getCdpInfo = async (): Promise<Record<string, unknown>> => {
   return handleResponse<Record<string, unknown>>(response);
 };
 
+export const getTaskWebSocket = async (
+  taskId: string
+): Promise<import("@/types/api").TaskWebSocketResponse> => {
+  const response = await fetch(withBase(`/agents/${taskId}/websocket`));
+  return handleResponse<import("@/types/api").TaskWebSocketResponse>(response);
+};
+
 export const createTaskEventSource = (taskId: string): EventSource => {
   const streamUrl = withBase(`/agents/${taskId}/stream`);
   return new EventSource(streamUrl);

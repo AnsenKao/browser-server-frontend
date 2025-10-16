@@ -17,6 +17,8 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
   const targetIdRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null); // Session ID for flatten mode
   const messageIdRef = useRef<number>(100); // Start from 100 to avoid conflicts
+  const imageWidthRef = useRef<number>(0); // Store actual image dimensions
+  const imageHeightRef = useRef<number>(0);
 
   const startScreencast = useCallback(async () => {
     if (!wsUrl || !enabled) {
@@ -51,6 +53,12 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
           ws.send(JSON.stringify({
             id: 0,
             method: "Page.enable"
+          }));
+
+          // Enable Input domain for user interactions
+          ws.send(JSON.stringify({
+            id: 10,
+            method: "Input.enable"
           }));
 
           // Start screencast
@@ -132,6 +140,13 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
             ws.send(JSON.stringify({
               id: ++messageIdRef.current,
               method: "Page.enable",
+              sessionId: sessionIdRef.current
+            }));
+            
+            // Enable Input domain for user interactions
+            ws.send(JSON.stringify({
+              id: ++messageIdRef.current,
+              method: "Input.enable",
               sessionId: sessionIdRef.current
             }));
             
@@ -235,6 +250,193 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
     }
   }, [wsUrl, enabled]);
 
+  // Send user input events to browser
+  const sendMouseEvent = useCallback((type: 'mousePressed' | 'mouseReleased' | 'mouseMoved', x: number, y: number, button?: 'left' | 'right' | 'middle') => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Convert canvas coordinates to page coordinates
+    // Use the actual image dimensions stored when rendering
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = imageWidthRef.current / rect.width;
+    const scaleY = imageHeightRef.current / rect.height;
+    
+    const pageX = Math.round(x * scaleX);
+    const pageY = Math.round(y * scaleY);
+
+    const eventParams = {
+      type,
+      x: pageX,
+      y: pageY,
+      button: button || 'left',
+      clickCount: type === 'mousePressed' ? 1 : undefined
+    };
+
+    // Send to page or session depending on connection type
+    if (wsUrl && wsUrl.includes('/page/')) {
+      wsRef.current.send(JSON.stringify({
+        id: ++messageIdRef.current,
+        method: "Input.dispatchMouseEvent",
+        params: eventParams
+      }));
+    } else if (sessionIdRef.current) {
+      wsRef.current.send(JSON.stringify({
+        id: ++messageIdRef.current,
+        method: "Input.dispatchMouseEvent",
+        params: eventParams,
+        sessionId: sessionIdRef.current
+      }));
+    }
+  }, [wsUrl]);
+
+  // Send text input directly to browser
+  const sendTextInput = useCallback((text: string) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.warn('[CDP] WebSocket not ready for text input');
+      return;
+    }
+
+    console.log('[CDP] Sending text input:', text);
+
+    // Send to page or session depending on connection type
+    if (wsUrl && wsUrl.includes('/page/')) {
+      wsRef.current.send(JSON.stringify({
+        id: ++messageIdRef.current,
+        method: "Input.insertText",
+        params: {
+          text: text
+        }
+      }));
+    } else if (sessionIdRef.current) {
+      wsRef.current.send(JSON.stringify({
+        id: ++messageIdRef.current,
+        method: "Input.insertText",
+        params: {
+          text: text
+        },
+        sessionId: sessionIdRef.current
+      }));
+    }
+  }, [wsUrl]);
+
+  const sendKeyEvent = useCallback((type: 'keyDown' | 'keyUp' | 'char', key: string, code?: string, text?: string) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.warn('[CDP] WebSocket not ready for key event');
+      return;
+    }
+
+    console.log('[CDP] Sending key event:', { type, key, code, text });
+
+    const eventParams: any = {
+      type,
+    };
+
+    // For keyDown/keyUp events
+    if (type === 'keyDown' || type === 'keyUp') {
+      eventParams.key = key;
+      if (code) {
+        eventParams.code = code;
+      }
+      
+      // Add windowsVirtualKeyCode for better compatibility (CDP requires this)
+      const windowsVirtualKeyCodeMap: { [key: string]: number } = {
+        'Backspace': 0x08,
+        'Tab': 0x09,
+        'Enter': 0x0D,
+        'Escape': 0x1B,
+        'Delete': 0x2E,
+        'ArrowLeft': 0x25,
+        'ArrowUp': 0x26,
+        'ArrowRight': 0x27,
+        'ArrowDown': 0x28,
+        'Home': 0x24,
+        'End': 0x23,
+        'PageUp': 0x21,
+        'PageDown': 0x22,
+      };
+      
+      if (windowsVirtualKeyCodeMap[key]) {
+        eventParams.windowsVirtualKeyCode = windowsVirtualKeyCodeMap[key];
+        eventParams.nativeVirtualKeyCode = windowsVirtualKeyCodeMap[key];
+      } else if (key.length === 1) {
+        // For regular characters, use their uppercase ASCII code
+        const charCode = key.toUpperCase().charCodeAt(0);
+        eventParams.windowsVirtualKeyCode = charCode;
+        eventParams.nativeVirtualKeyCode = charCode;
+        eventParams.text = key;
+        eventParams.unmodifiedText = key;
+      }
+    }
+    
+    // For char events (text input)
+    if (type === 'char' && text) {
+      eventParams.text = text;
+      eventParams.unmodifiedText = text;
+    }
+
+    // Send to page or session depending on connection type
+    if (wsUrl && wsUrl.includes('/page/')) {
+      wsRef.current.send(JSON.stringify({
+        id: ++messageIdRef.current,
+        method: "Input.dispatchKeyEvent",
+        params: eventParams
+      }));
+    } else if (sessionIdRef.current) {
+      wsRef.current.send(JSON.stringify({
+        id: ++messageIdRef.current,
+        method: "Input.dispatchKeyEvent",
+        params: eventParams,
+        sessionId: sessionIdRef.current
+      }));
+    }
+  }, [wsUrl]);
+
+  const sendScrollEvent = useCallback((deltaX: number, deltaY: number, x: number, y: number) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Convert canvas coordinates to page coordinates
+    // Use the actual image dimensions stored when rendering
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = imageWidthRef.current / rect.width;
+    const scaleY = imageHeightRef.current / rect.height;
+    
+    const pageX = Math.round(x * scaleX);
+    const pageY = Math.round(y * scaleY);
+
+    const eventParams = {
+      type: 'mouseWheel',
+      x: pageX,
+      y: pageY,
+      deltaX,
+      deltaY
+    };
+
+    // Send to page or session depending on connection type
+    if (wsUrl && wsUrl.includes('/page/')) {
+      wsRef.current.send(JSON.stringify({
+        id: ++messageIdRef.current,
+        method: "Input.dispatchMouseEvent",
+        params: eventParams
+      }));
+    } else if (sessionIdRef.current) {
+      wsRef.current.send(JSON.stringify({
+        id: ++messageIdRef.current,
+        method: "Input.dispatchMouseEvent",
+        params: eventParams,
+        sessionId: sessionIdRef.current
+      }));
+    }
+  }, [wsUrl]);
+
   const stopScreencast = useCallback(() => {
     // Clear screenshot polling interval
     if (screenshotIntervalRef.current) {
@@ -297,8 +499,15 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
 
     const img = new Image();
     img.onload = () => {
+      // Store actual image dimensions for coordinate conversion
+      imageWidthRef.current = img.width;
+      imageHeightRef.current = img.height;
+      
+      // Set canvas internal resolution to match image
       canvas.width = img.width;
       canvas.height = img.height;
+      
+      // Draw image
       ctx.drawImage(img, 0, 0);
     };
     img.onerror = (err) => {
@@ -313,6 +522,10 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
     lastFrame,
     canvasRef,
     startScreencast,
-    stopScreencast
+    stopScreencast,
+    sendMouseEvent,
+    sendKeyEvent,
+    sendScrollEvent,
+    sendTextInput
   };
 }

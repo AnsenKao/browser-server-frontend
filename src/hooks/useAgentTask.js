@@ -4,7 +4,7 @@ import { createId } from "@/lib/id";
 const DEFAULT_MODEL = import.meta.env.VITE_DEFAULT_MODEL;
 const DEFAULT_PROVIDER = import.meta.env.VITE_DEFAULT_PROVIDER ?? "azure-openai";
 const DEFAULT_OPTIONS = {
-    headless: true,
+    headless: false,
     enable_cdp: true,
     max_steps: 20
 };

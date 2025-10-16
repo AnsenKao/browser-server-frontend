@@ -87,6 +87,17 @@
   width: auto;
   height: auto;
   object-fit: contain;
+  border-radius: 0.5rem;
+  transition: box-shadow 0.2s ease;
+}
+
+.canvas:hover {
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4);
+}
+
+.canvas:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.6);
 }
 
 .overlay {

@@ -63,6 +63,10 @@ export const getCdpInfo = async () => {
     const response = await fetch(withBase("/cdp"));
     return handleResponse(response);
 };
+export const getTaskWebSocket = async (taskId) => {
+    const response = await fetch(withBase(`/agents/${taskId}/websocket`));
+    return handleResponse(response);
+};
 export const createTaskEventSource = (taskId) => {
     const streamUrl = withBase(`/agents/${taskId}/stream`);
     return new EventSource(streamUrl);

@@ -78,3 +78,14 @@ export type StreamEvent =
   | StreamLogEvent
   | StreamDoneEvent
   | StreamErrorEvent;
+
+export interface TaskWebSocketResponse {
+  task_id: string;
+  websocket_url?: string | null;
+  page_id?: string | null;
+  page_title?: string | null;
+  page_url?: string | null;
+  inspect_url?: string | null;
+  cdp_enabled: boolean;
+  error?: string | null;
+}
