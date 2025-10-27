@@ -144,27 +144,36 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }) {
             }
             isMouseDown = true;
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left + calibrationOffset.x;
-            const y = e.clientY - rect.top + calibrationOffset.y;
+            const rawX = e.clientX - rect.left;
+            const rawY = e.clientY - rect.top;
             const button = e.button === 0 ? 'left' : e.button === 2 ? 'right' : 'middle';
-            screencast.sendMouseEvent('mousePressed', x, y, button);
+            screencast.sendMouseEvent('mousePressed', rawX, rawY, {
+                button,
+                calibrationOffset
+            });
         };
         const handleMouseUp = (e) => {
             if (!isMouseDown)
                 return;
             isMouseDown = false;
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left + calibrationOffset.x;
-            const y = e.clientY - rect.top + calibrationOffset.y;
+            const rawX = e.clientX - rect.left;
+            const rawY = e.clientY - rect.top;
             const button = e.button === 0 ? 'left' : e.button === 2 ? 'right' : 'middle';
-            screencast.sendMouseEvent('mouseReleased', x, y, button);
+            screencast.sendMouseEvent('mouseReleased', rawX, rawY, {
+                button,
+                calibrationOffset
+            });
             // Enable text input mode after click
             textInputMode = true;
             textInput.style.pointerEvents = 'auto';
-            textInput.style.left = `${x}px`;
-            textInput.style.top = `${y}px`;
+            textInput.style.left = `${rawX + calibrationOffset.x}px`;
+            textInput.style.top = `${rawY + calibrationOffset.y}px`;
             textInput.focus();
-            console.log('[Canvas] Text input mode enabled at:', { x, y });
+            console.log('[Canvas] Text input mode enabled at:', {
+                x: rawX + calibrationOffset.x,
+                y: rawY + calibrationOffset.y
+            });
         };
         const handleMouseMove = (e) => {
             const rect = canvas.getBoundingClientRect();
@@ -176,16 +185,18 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }) {
                 setShowMouseCursor(true);
                 return; // 校正模式下不發送滑鼠移動事件
             }
-            const x = rawX + calibrationOffset.x;
-            const y = rawY + calibrationOffset.y;
-            screencast.sendMouseEvent('mouseMoved', x, y);
+            screencast.sendMouseEvent('mouseMoved', rawX, rawY, {
+                calibrationOffset
+            });
         };
         const handleWheel = (e) => {
             e.preventDefault();
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left + calibrationOffset.x;
-            const y = e.clientY - rect.top + calibrationOffset.y;
-            screencast.sendScrollEvent(e.deltaX, e.deltaY, x, y);
+            const rawX = e.clientX - rect.left;
+            const rawY = e.clientY - rect.top;
+            screencast.sendScrollEvent(e.deltaX, e.deltaY, rawX, rawY, {
+                calibrationOffset
+            });
         };
         const handleKeyDown = (e) => {
             // Handle special keys and send them to browser
