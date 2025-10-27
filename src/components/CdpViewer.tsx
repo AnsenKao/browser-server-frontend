@@ -150,9 +150,10 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
         const clickX = e.clientX - rect.left;
         const clickY = e.clientY - rect.top;
         
-        // 計算偏移量（用戶點擊位置 - 校正點位置）
-        const offsetX = clickX - calibrationDotPosition.x;
-        const offsetY = clickY - calibrationDotPosition.y;
+        // 計算偏移量（校正點位置 - 用戶點擊位置）
+        // 這樣在應用時用加法：實際座標 = 點擊座標 + 偏移量
+        const offsetX = calibrationDotPosition.x - clickX;
+        const offsetY = calibrationDotPosition.y - clickY;
         
         setCalibrationOffset({ x: offsetX, y: offsetY });
         setIsCalibrating(false);
@@ -163,6 +164,8 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
         console.log('[Calibration] Offset set:', { 
           offsetX, 
           offsetY, 
+          clickPosition: { x: clickX, y: clickY },
+          targetPosition: calibrationDotPosition,
           isAccurate: isAccurate ? '座標很準確！' : '已校正偏移',
           tip: isAccurate ? '偏移量很小，座標應該是準確的' : '偏移量較大，已應用校正'
         });
@@ -359,19 +362,19 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
     // 獲取 canvas 的實際渲染尺寸
     const rect = canvas.getBoundingClientRect();
     
-    // 讓用戶選擇校正點的位置，而不是強制在中央
-    // 這樣更靈活，用戶可以選擇一個明顯的參考點
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
+    // 使用左上角作為校正點 - 這是最可靠的參考點
+    // 左上角對應座標 (0, 0)，不受瀏覽器 UI 影響
+    const topLeftX = 30; // 留一點邊距，方便點擊
+    const topLeftY = 30;
     
-    setCalibrationDotPosition({ x: centerX, y: centerY });
+    setCalibrationDotPosition({ x: topLeftX, y: topLeftY });
     setIsCalibrating(true);
     setShowCalibrationDot(true);
     
     console.log('[Calibration] Started:', { 
-      centerX, 
-      centerY,
-      tip: '如果座標準確，偏移量應該很小'
+      topLeftX, 
+      topLeftY,
+      tip: '左上角是最可靠的校正參考點'
     });
   };
   
@@ -571,7 +574,7 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
           >
             <div className={styles.calibrationDotCenter}></div>
             <div className={styles.calibrationInstruction}>
-              校正座標參考點
+              校正座標參考點（左上角）
               <br />
               <small style={{ opacity: 0.8 }}>
                 將藍色游標對準紅點中央後點擊

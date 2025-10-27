@@ -65,48 +65,9 @@ function App() {
         const input = rawInput.trim();
         if (!input)
             return;
-        const normalized = input.toLowerCase();
-        if (normalized === "help") {
-            appendMessage("system", HELP_TEXT);
-            return;
-        }
-        if (normalized === "clear") {
-            reset();
-            appendMessage("system", "對話已清除。");
-            return;
-        }
-        if (normalized.startsWith("task/stream")) {
-            appendMessage("user", input);
-            await startStream();
-            return;
-        }
-        if (normalized.startsWith("task/pause")) {
-            appendMessage("user", input);
-            await pauseTask();
-            return;
-        }
-        if (normalized.startsWith("task/resume")) {
-            appendMessage("user", input);
-            await resumeTask();
-            return;
-        }
-        if (normalized.startsWith("task/stop")) {
-            appendMessage("user", input);
-            await stopTask();
-            return;
-        }
-        if (normalized.startsWith("task")) {
-            const { description, overrides } = parseTaskCommand(input);
-            if (!description) {
-                appendMessage("system", "請提供任務描述，例如：task 搜尋最新的 FastAPI 教學");
-                return;
-            }
-            await createTask(description, overrides);
-            return;
-        }
-        appendMessage("system", `無法辨識指令：${input}。輸入 help 查看支援的指令。`);
-    }, [appendMessage, createTask, pauseTask, reset, resumeTask, startStream, stopTask]);
-    return (_jsxs("div", { className: styles.app, children: [_jsxs("section", { className: styles.chatPane, children: [_jsxs("header", { className: styles.chatHeader, children: [_jsx("h1", { children: "Browser Agent \u63A7\u5236\u4E2D\u5FC3" }), _jsxs("div", { className: styles.statusBar, children: [_jsx("span", { className: `${styles.statusDot} ${isStreaming ? styles.statusDotActive : ""}` }), _jsxs("span", { children: ["\u4E32\u6D41\u72C0\u614B\uFF1A", isStreaming ? "監看中" : "未連線"] }), _jsxs("span", { children: ["\u4EFB\u52D9\u72C0\u614B\uFF1A", statusLabel] })] }), _jsxs("p", { children: ["\u4F7F\u7528\u6307\u4EE4\u5982 ", _jsx("code", { children: "task \u53BB Google \u641C\u7D22 FastAPI" }), " \u6216\u8F38\u5165 ", _jsx("code", { children: "help" }), " \u67E5\u770B\u6240\u6709\u6307\u4EE4\u3002"] })] }), _jsx("div", { className: styles.messagesWrapper, children: _jsx(MessageList, { messages: messages }) }), _jsx(TaskControls, { taskId: currentTaskId, status: taskStatus, isBusy: isBusy, onPause: pauseTask, onResume: resumeTask, onStop: stopTask }), _jsx(ChatInput, { onSubmit: handleCommand, isDisabled: isBusy })] }), _jsx("section", { className: styles.previewPane, children: _jsx(CdpViewer, { inspectUrl: inspectUrl ?? undefined, fallbackUrl: cdpFallbackUrl, isEnabled: Boolean(currentTaskId), taskId: currentTaskId }) })] }));
+        await createTask(input, {});
+    }, [createTask]);
+    return (_jsxs("div", { className: styles.app, children: [_jsxs("section", { className: styles.chatPane, children: [_jsxs("header", { className: styles.chatHeader, children: [_jsx("h1", { children: "Browser Agent \u63A7\u5236\u4E2D\u5FC3" }), _jsxs("div", { className: styles.statusBar, children: [_jsx("span", { className: `${styles.statusDot} ${isStreaming ? styles.statusDotActive : ""}` }), _jsxs("span", { children: ["\u4E32\u6D41\u72C0\u614B\uFF1A", isStreaming ? "監看中" : "未連線"] }), _jsxs("span", { children: ["\u4EFB\u52D9\u72C0\u614B\uFF1A", statusLabel] })] }), _jsxs("p", { children: ["\u76F4\u63A5\u8F38\u5165\u4EFB\u52D9\u63CF\u8FF0\u5373\u53EF\u57F7\u884C\uFF0C\u4F8B\u5982\uFF1A", _jsx("code", { children: "\u53BB Google \u641C\u7D22 FastAPI" })] })] }), _jsx("div", { className: styles.messagesWrapper, children: _jsx(MessageList, { messages: messages }) }), _jsx(TaskControls, { taskId: currentTaskId, status: taskStatus, isBusy: isBusy, onPause: pauseTask, onResume: resumeTask, onStop: stopTask }), _jsx(ChatInput, { onSubmit: handleCommand, isDisabled: isBusy })] }), _jsx("section", { className: styles.previewPane, children: _jsx(CdpViewer, { inspectUrl: inspectUrl ?? undefined, fallbackUrl: cdpFallbackUrl, isEnabled: Boolean(currentTaskId), taskId: currentTaskId }) })] }));
 }
 export default App;
 export { parseTaskCommand };

@@ -18,6 +18,15 @@ export function ChatInput({ onSubmit, isDisabled = false }) {
             setIsSubmitting(false);
         }
     };
-    return (_jsxs("form", { className: styles.form, onSubmit: handleSubmit, children: [_jsx("textarea", { className: styles.textarea, value: value, onChange: (event) => setValue(event.target.value), placeholder: "\u8F38\u5165\u6307\u4EE4\uFF0C\u4F8B\u5982\uFF1Atask \u641C\u5C0B\u6700\u65B0\u7684 FastAPI \u6559\u5B78 \u6216 task/stream", rows: 3, disabled: isDisabled || isSubmitting }), _jsx("button", { type: "submit", className: styles.button, disabled: isDisabled || isSubmitting, children: isSubmitting ? "Sending…" : "Send" })] }));
+    const handleKeyDown = (event) => {
+        // Enter 送出，Shift+Enter 换行
+        if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            if (value.trim() && !isDisabled && !isSubmitting) {
+                handleSubmit(event);
+            }
+        }
+    };
+    return (_jsxs("form", { className: styles.form, onSubmit: handleSubmit, children: [_jsx("textarea", { className: styles.textarea, value: value, onChange: (event) => setValue(event.target.value), onKeyDown: handleKeyDown, placeholder: "\u8F38\u5165\u4EFB\u52D9\u63CF\u8FF0\u5F8C\u6309 Enter \u9001\u51FA\uFF0CShift+Enter \u63DB\u884C", rows: 3, disabled: isDisabled || isSubmitting }), _jsx("button", { type: "submit", className: styles.button, disabled: isDisabled || isSubmitting, children: isSubmitting ? "Sending…" : "Send" })] }));
 }
 export default ChatInput;

@@ -93,57 +93,9 @@ function App() {
       const input = rawInput.trim();
       if (!input) return;
 
-      const normalized = input.toLowerCase();
-
-      if (normalized === "help") {
-        appendMessage("system", HELP_TEXT);
-        return;
-      }
-
-      if (normalized === "clear") {
-        reset();
-        appendMessage("system", "對話已清除。");
-        return;
-      }
-
-      if (normalized.startsWith("task/stream")) {
-        appendMessage("user", input);
-        await startStream();
-        return;
-      }
-
-      if (normalized.startsWith("task/pause")) {
-        appendMessage("user", input);
-        await pauseTask();
-        return;
-      }
-
-      if (normalized.startsWith("task/resume")) {
-        appendMessage("user", input);
-        await resumeTask();
-        return;
-      }
-
-      if (normalized.startsWith("task/stop")) {
-        appendMessage("user", input);
-        await stopTask();
-        return;
-      }
-
-      if (normalized.startsWith("task")) {
-        const { description, overrides } = parseTaskCommand(input);
-        if (!description) {
-          appendMessage("system", "請提供任務描述，例如：task 搜尋最新的 FastAPI 教學");
-          return;
-        }
-
-        await createTask(description, overrides);
-        return;
-      }
-
-      appendMessage("system", `無法辨識指令：${input}。輸入 help 查看支援的指令。`);
+      await createTask(input, {});
     },
-    [appendMessage, createTask, pauseTask, reset, resumeTask, startStream, stopTask]
+    [createTask]
   );
 
   return (
@@ -158,7 +110,7 @@ function App() {
             <span>串流狀態：{isStreaming ? "監看中" : "未連線"}</span>
             <span>任務狀態：{statusLabel}</span>
           </div>
-          <p>使用指令如 <code>task 去 Google 搜索 FastAPI</code> 或輸入 <code>help</code> 查看所有指令。</p>
+          <p>直接輸入任務描述即可執行，例如：<code>去 Google 搜索 FastAPI</code></p>
         </header>
         <div className={styles.messagesWrapper}>
           <MessageList messages={messages} />
