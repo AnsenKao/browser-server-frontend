@@ -18,6 +18,14 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
     pageUrl?: string;
     pageTitle?: string;
   } | null>(null);
+  
+  // 座標校正相關狀態
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const [calibrationOffset, setCalibrationOffset] = useState({ x: 0, y: 0 });
+  const [showCalibrationDot, setShowCalibrationDot] = useState(false);
+  const [calibrationDotPosition, setCalibrationDotPosition] = useState({ x: 0, y: 0 });
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [showMouseCursor, setShowMouseCursor] = useState(false);
 
   // Fetch CDP WebSocket URL with retry logic
   useEffect(() => {
@@ -136,10 +144,35 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
     }
 
     const handleMouseDown = (e: MouseEvent) => {
+      // 如果在校正模式，處理校正點擊
+      if (isCalibrating) {
+        const rect = canvas.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+        
+        // 計算偏移量（用戶點擊位置 - 校正點位置）
+        const offsetX = clickX - calibrationDotPosition.x;
+        const offsetY = clickY - calibrationDotPosition.y;
+        
+        setCalibrationOffset({ x: offsetX, y: offsetY });
+        setIsCalibrating(false);
+        setShowCalibrationDot(false);
+        
+        // 提供更有用的反饋
+        const isAccurate = Math.abs(offsetX) < 10 && Math.abs(offsetY) < 10;
+        console.log('[Calibration] Offset set:', { 
+          offsetX, 
+          offsetY, 
+          isAccurate: isAccurate ? '座標很準確！' : '已校正偏移',
+          tip: isAccurate ? '偏移量很小，座標應該是準確的' : '偏移量較大，已應用校正'
+        });
+        return;
+      }
+      
       isMouseDown = true;
       const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const x = e.clientX - rect.left + calibrationOffset.x;
+      const y = e.clientY - rect.top + calibrationOffset.y;
       
       const button = e.button === 0 ? 'left' : e.button === 2 ? 'right' : 'middle';
       screencast.sendMouseEvent('mousePressed', x, y, button);
@@ -150,8 +183,8 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
       isMouseDown = false;
       
       const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const x = e.clientX - rect.left + calibrationOffset.x;
+      const y = e.clientY - rect.top + calibrationOffset.y;
       
       const button = e.button === 0 ? 'left' : e.button === 2 ? 'right' : 'middle';
       screencast.sendMouseEvent('mouseReleased', x, y, button);
@@ -167,8 +200,18 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
 
     const handleMouseMove = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const rawX = e.clientX - rect.left;
+      const rawY = e.clientY - rect.top;
+      
+      // 如果在校正模式，更新滑鼠位置顯示
+      if (isCalibrating) {
+        setMousePosition({ x: rawX, y: rawY });
+        setShowMouseCursor(true);
+        return; // 校正模式下不發送滑鼠移動事件
+      }
+      
+      const x = rawX + calibrationOffset.x;
+      const y = rawY + calibrationOffset.y;
       
       screencast.sendMouseEvent('mouseMoved', x, y);
     };
@@ -176,8 +219,8 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const x = e.clientX - rect.left + calibrationOffset.x;
+      const y = e.clientY - rect.top + calibrationOffset.y;
       
       screencast.sendScrollEvent(e.deltaX, e.deltaY, x, y);
     };
@@ -248,10 +291,24 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
       }
     };
 
+    const handleMouseLeave = () => {
+      if (isCalibrating) {
+        setShowMouseCursor(false);
+      }
+    };
+    
+    const handleMouseEnter = () => {
+      if (isCalibrating) {
+        setShowMouseCursor(true);
+      }
+    };
+    
     // Add event listeners
     canvas.addEventListener('mousedown', handleMouseDown);
     canvas.addEventListener('mouseup', handleMouseUp);
     canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseleave', handleMouseLeave);
+    canvas.addEventListener('mouseenter', handleMouseEnter);
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     
     // Add keyboard event listeners to canvas
@@ -273,6 +330,8 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
       canvas.removeEventListener('mousedown', handleMouseDown);
       canvas.removeEventListener('mouseup', handleMouseUp);
       canvas.removeEventListener('mousemove', handleMouseMove);
+      canvas.removeEventListener('mouseleave', handleMouseLeave);
+      canvas.removeEventListener('mouseenter', handleMouseEnter);
       canvas.removeEventListener('wheel', handleWheel);
       canvas.removeEventListener('keydown', handleKeyDown);
       canvas.removeEventListener('keyup', handleKeyUp);
@@ -288,7 +347,42 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
         canvasContainer.removeChild(textInput);
       }
     };
-  }, [screencast.isStreaming, screencast.sendMouseEvent, screencast.sendKeyEvent, screencast.sendScrollEvent, screencast.sendTextInput]);
+  }, [screencast.isStreaming, screencast.sendMouseEvent, screencast.sendKeyEvent, screencast.sendScrollEvent, screencast.sendTextInput, isCalibrating, calibrationOffset, calibrationDotPosition]);
+
+  // 開始座標校正
+  const startCalibration = () => {
+    if (!screencast.isStreaming) return;
+    
+    const canvas = screencast.canvasRef.current;
+    if (!canvas) return;
+    
+    // 獲取 canvas 的實際渲染尺寸
+    const rect = canvas.getBoundingClientRect();
+    
+    // 讓用戶選擇校正點的位置，而不是強制在中央
+    // 這樣更靈活，用戶可以選擇一個明顯的參考點
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    setCalibrationDotPosition({ x: centerX, y: centerY });
+    setIsCalibrating(true);
+    setShowCalibrationDot(true);
+    
+    console.log('[Calibration] Started:', { 
+      centerX, 
+      centerY,
+      tip: '如果座標準確，偏移量應該很小'
+    });
+  };
+  
+  // 重置座標校正
+  const resetCalibration = () => {
+    setCalibrationOffset({ x: 0, y: 0 });
+    setIsCalibrating(false);
+    setShowCalibrationDot(false);
+    setShowMouseCursor(false);
+    console.log('[Calibration] Reset');
+  };
 
   // Start/stop screencast based on WebSocket availability
   useEffect(() => {
@@ -389,15 +483,63 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
             </button>
           )}
           {screencast.isStreaming && (
-            <span style={{ 
-              fontSize: '0.8rem', 
-              color: 'rgba(34, 197, 94, 0.9)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.3rem'
-            }}>
-              🖱️ 可互動
-            </span>
+            <>
+              <span style={{ 
+                fontSize: '0.8rem', 
+                color: 'rgba(34, 197, 94, 0.9)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem'
+              }}>
+                🖱️ 可互動
+              </span>
+              <button 
+                className={styles.calibrateButton}
+                onClick={startCalibration}
+                disabled={isCalibrating}
+                title={isCalibrating ? "點擊畫面上的紅點來校正座標" : "校正滑鼠座標"}
+              >
+                {isCalibrating ? "🎯 校正中..." : "🎯 校正座標"}
+              </button>
+              {isCalibrating && (
+                <button 
+                  className={styles.cancelButton}
+                  onClick={resetCalibration}
+                  title="取消校正"
+                >
+                  ❌ 取消
+                </button>
+              )}
+              {(calibrationOffset.x !== 0 || calibrationOffset.y !== 0) && (
+                <div style={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <span style={{ 
+                    fontSize: '0.7rem', 
+                    color: Math.abs(calibrationOffset.x) < 10 && Math.abs(calibrationOffset.y) < 10 
+                      ? 'rgba(34, 197, 94, 0.7)' 
+                      : 'rgba(255, 165, 0, 0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.2rem'
+                  }}>
+                    {Math.abs(calibrationOffset.x) < 10 && Math.abs(calibrationOffset.y) < 10 
+                      ? '✓ 座標精確' 
+                      : '⚠ 已校正'
+                    } ({calibrationOffset.x > 0 ? '+' : ''}{calibrationOffset.x.toFixed(0)}, {calibrationOffset.y > 0 ? '+' : ''}{calibrationOffset.y.toFixed(0)})
+                  </span>
+                  <button 
+                    className={styles.resetButton}
+                    onClick={resetCalibration}
+                    title="重置校正，恢復原始座標"
+                  >
+                    🔄 重置
+                  </button>
+                </div>
+              )}
+            </>
           )}
           {inspectUrl && (
             <a className={styles.link} href={inspectUrl} target="_blank" rel="noreferrer">
@@ -410,8 +552,8 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
         <canvas 
           ref={screencast.canvasRef}
           className={styles.canvas}
-          style={{ cursor: 'pointer', outline: 'none' }}
-          title="點擊、拖拽或滾動以與瀏覽器互動"
+          style={{ cursor: isCalibrating ? 'crosshair' : 'pointer', outline: 'none' }}
+          title={isCalibrating ? "點擊紅點來校正座標" : "點擊、拖拽或滾動以與瀏覽器互動"}
         />
         {!screencast.isStreaming && (
           <div className={styles.overlay}>
@@ -419,7 +561,42 @@ export function CdpViewer({ inspectUrl, fallbackUrl, isEnabled, taskId }: CdpVie
             <button onClick={screencast.startScreencast}>▶ 重新開始</button>
           </div>
         )}
-        {screencast.isStreaming && (
+        {showCalibrationDot && isCalibrating && (
+          <div 
+            className={styles.calibrationDot}
+            style={{
+              left: `${calibrationDotPosition.x}px`,
+              top: `${calibrationDotPosition.y}px`
+            }}
+          >
+            <div className={styles.calibrationDotCenter}></div>
+            <div className={styles.calibrationInstruction}>
+              校正座標參考點
+              <br />
+              <small style={{ opacity: 0.8 }}>
+                將藍色游標對準紅點中央後點擊
+              </small>
+            </div>
+          </div>
+        )}
+        {showMouseCursor && isCalibrating && (
+          <div 
+            className={styles.mouseCursor}
+            style={{
+              left: `${mousePosition.x}px`,
+              top: `${mousePosition.y}px`
+            }}
+          >
+            <div className={styles.mouseCursorDot}></div>
+            <div className={styles.distanceIndicator}>
+              距離: {Math.round(Math.sqrt(
+                Math.pow(mousePosition.x - calibrationDotPosition.x, 2) + 
+                Math.pow(mousePosition.y - calibrationDotPosition.y, 2)
+              ))}px
+            </div>
+          </div>
+        )}
+        {screencast.isStreaming && !isCalibrating && (
           <div style={{
             position: 'absolute',
             bottom: '0.5rem',

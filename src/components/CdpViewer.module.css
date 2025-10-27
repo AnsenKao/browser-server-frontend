@@ -155,3 +155,169 @@
   padding: 0.2rem 0.4rem;
   border-radius: 0.35rem;
 }
+
+/* 座標校正按鈕樣式 */
+.calibrateButton {
+  padding: 0.4rem 0.8rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(255, 165, 0, 0.15);
+  color: rgba(255, 165, 0, 0.9);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.calibrateButton:hover {
+  background: rgba(255, 165, 0, 0.25);
+  border-color: rgba(255, 165, 0, 0.5);
+}
+
+.calibrateButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: rgba(239, 68, 68, 0.15);
+  color: rgba(239, 68, 68, 0.9);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* 取消按鈕樣式 */
+.cancelButton {
+  padding: 0.4rem 0.8rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(148, 163, 184, 0.15);
+  color: rgba(148, 163, 184, 0.9);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancelButton:hover {
+  background: rgba(148, 163, 184, 0.25);
+  border-color: rgba(148, 163, 184, 0.5);
+}
+
+/* 重置按鈕樣式 */
+.resetButton {
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.3rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(148, 163, 184, 0.1);
+  color: rgba(148, 163, 184, 0.8);
+  font-size: 0.7rem;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.resetButton:hover {
+  background: rgba(148, 163, 184, 0.2);
+  border-color: rgba(148, 163, 184, 0.5);
+  color: rgba(148, 163, 184, 0.9);
+}
+
+/* 校正點樣式 */
+.calibrationDot {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+  margin-top: -10px;
+  z-index: 1000;
+  pointer-events: none;
+  animation: calibrationPulse 1.5s ease-in-out infinite;
+}
+
+.calibrationDotCenter {
+  width: 12px;
+  height: 12px;
+  background: #ef4444;
+  border-radius: 50%;
+  margin: 4px;
+  box-shadow: 
+    0 0 0 2px rgba(255, 255, 255, 0.8),
+    0 0 0 4px rgba(239, 68, 68, 0.3),
+    0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+.calibrationInstruction {
+  position: absolute;
+  top: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.9);
+  color: rgba(239, 68, 68, 0.9);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.3;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  max-width: 200px;
+}
+
+@keyframes calibrationPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+/* 滑鼠游標指示器樣式 */
+.mouseCursor {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin-left: -8px;
+  margin-top: -8px;
+  z-index: 1001;
+  pointer-events: none;
+}
+
+.mouseCursorDot {
+  width: 16px;
+  height: 16px;
+  background: #3b82f6;
+  border-radius: 50%;
+  box-shadow: 
+    0 0 0 2px rgba(255, 255, 255, 0.9),
+    0 0 0 4px rgba(59, 130, 246, 0.3),
+    0 0 8px rgba(59, 130, 246, 0.6);
+  animation: mouseCursorPulse 1s ease-in-out infinite;
+}
+
+.distanceIndicator {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.9);
+  color: rgba(59, 130, 246, 0.9);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes mouseCursorPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
