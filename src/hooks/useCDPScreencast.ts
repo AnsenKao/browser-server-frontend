@@ -6,6 +6,26 @@ interface UseCDPScreencastOptions {
   enabled: boolean;
 }
 
+interface CalibrationOffset {
+  x: number;
+  y: number;
+}
+
+interface CanvasPointOptions {
+  calibrationOffset?: CalibrationOffset;
+  button?: 'left' | 'right' | 'middle';
+}
+
+interface ViewportMetadata {
+  deviceWidth: number;
+  deviceHeight: number;
+  pageScaleFactor: number;
+  offsetTop: number;
+  offsetLeft: number;
+  scrollOffsetX: number;
+  scrollOffsetY: number;
+}
+
 export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,6 +39,85 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
   const messageIdRef = useRef<number>(100); // Start from 100 to avoid conflicts
   const imageWidthRef = useRef<number>(0); // Store actual image dimensions
   const imageHeightRef = useRef<number>(0);
+  const viewportMetadataRef = useRef<ViewportMetadata>({
+    deviceWidth: 0,
+    deviceHeight: 0,
+    pageScaleFactor: 1,
+    offsetTop: 0,
+    offsetLeft: 0,
+    scrollOffsetX: 0,
+    scrollOffsetY: 0
+  });
+  const pendingLayoutMetricsRequestIdRef = useRef<number | null>(null);
+
+  const updateViewportMetadata = useCallback((metadata: Partial<ViewportMetadata>) => {
+    const sanitized = Object.entries(metadata).reduce<Partial<ViewportMetadata>>((acc, [key, value]) => {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        (acc as any)[key] = value;
+      }
+      return acc;
+    }, {});
+
+    viewportMetadataRef.current = {
+      ...viewportMetadataRef.current,
+      ...sanitized
+    };
+  }, []);
+
+  const requestLayoutMetrics = useCallback(() => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !sessionIdRef.current) {
+      return;
+    }
+
+    const requestId = ++messageIdRef.current;
+    pendingLayoutMetricsRequestIdRef.current = requestId;
+
+    wsRef.current.send(
+      JSON.stringify({
+        id: requestId,
+        method: "Page.getLayoutMetrics",
+        sessionId: sessionIdRef.current
+      })
+    );
+  }, []);
+
+  const convertCanvasPoint = useCallback(
+    (canvasX: number, canvasY: number, rect: DOMRect, calibrationOffset?: CalibrationOffset) => {
+      const manualOffsetX = calibrationOffset?.x ?? 0;
+      const manualOffsetY = calibrationOffset?.y ?? 0;
+
+      const scaleX = rect.width > 0 && imageWidthRef.current > 0 ? imageWidthRef.current / rect.width : 1;
+      const scaleY = rect.height > 0 && imageHeightRef.current > 0 ? imageHeightRef.current / rect.height : 1;
+
+      const imageX = (canvasX + manualOffsetX) * scaleX;
+      const imageY = (canvasY + manualOffsetY) * scaleY;
+
+      const {
+        offsetLeft,
+        offsetTop,
+        pageScaleFactor,
+        deviceWidth,
+        deviceHeight
+      } = viewportMetadataRef.current;
+
+      const viewportScale = pageScaleFactor || 1;
+      let viewportX = (imageX - offsetLeft) / viewportScale;
+      let viewportY = (imageY - offsetTop) / viewportScale;
+
+      if (deviceWidth > 0 && Number.isFinite(deviceWidth)) {
+        viewportX = Math.max(0, Math.min(deviceWidth - 1, viewportX));
+      }
+      if (deviceHeight > 0 && Number.isFinite(deviceHeight)) {
+        viewportY = Math.max(0, Math.min(deviceHeight - 1, viewportY));
+      }
+
+      return {
+        x: Math.round(viewportX),
+        y: Math.round(viewportY)
+      };
+    },
+    []
+  );
 
   const startScreencast = useCallback(async () => {
     if (!wsUrl || !enabled) {
@@ -94,12 +193,43 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          
+
           // Log errors
           if (message.error) {
             console.error("[CDP] Error:", message.error);
           }
-          
+
+          if (pendingLayoutMetricsRequestIdRef.current !== null && message.id === pendingLayoutMetricsRequestIdRef.current) {
+            pendingLayoutMetricsRequestIdRef.current = null;
+
+            if (message.result) {
+              const visualViewport = message.result.visualViewport;
+              const layoutViewport = message.result.layoutViewport;
+
+              updateViewportMetadata({
+                deviceWidth:
+                  typeof visualViewport?.clientWidth === 'number'
+                    ? visualViewport.clientWidth
+                    : typeof layoutViewport?.clientWidth === 'number'
+                      ? layoutViewport.clientWidth
+                      : undefined,
+                deviceHeight:
+                  typeof visualViewport?.clientHeight === 'number'
+                    ? visualViewport.clientHeight
+                    : typeof layoutViewport?.clientHeight === 'number'
+                      ? layoutViewport.clientHeight
+                      : undefined,
+                pageScaleFactor: typeof visualViewport?.scale === 'number' ? visualViewport.scale : undefined,
+                scrollOffsetX: typeof visualViewport?.pageX === 'number' ? visualViewport.pageX : undefined,
+                scrollOffsetY: typeof visualViewport?.pageY === 'number' ? visualViewport.pageY : undefined,
+                offsetLeft: 0,
+                offsetTop: 0
+              });
+            }
+
+            return;
+          }
+
           // Handle Target.getTargets response
           if (message.result && message.result.targetInfos) {
             const targets = message.result.targetInfos || [];
@@ -135,27 +265,30 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
           // Handle Target.attachToTarget response
           if (message.result && message.result.sessionId) {
             sessionIdRef.current = message.result.sessionId;
-            
+
             // Now enable Page domain using flatten mode (sessionId in command)
             ws.send(JSON.stringify({
               id: ++messageIdRef.current,
               method: "Page.enable",
               sessionId: sessionIdRef.current
             }));
-            
+
             // Enable Input domain for user interactions
             ws.send(JSON.stringify({
               id: ++messageIdRef.current,
               method: "Input.enable",
               sessionId: sessionIdRef.current
             }));
-            
+
             // Start screenshot polling using flatten mode
             const captureScreenshot = () => {
               if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !sessionIdRef.current) {
                 return;
               }
-              
+
+              // 更新視覺視窗資訊，改善滑鼠座標精準度
+              requestLayoutMetrics();
+
               ws.send(JSON.stringify({
                 id: ++messageIdRef.current,
                 method: "Page.captureScreenshot",
@@ -166,10 +299,10 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
                 sessionId: sessionIdRef.current
               }));
             };
-            
+
             // Capture first screenshot immediately
             captureScreenshot();
-            
+
             // Then poll every 500ms
             screenshotIntervalRef.current = window.setInterval(captureScreenshot, 500);
           }
@@ -206,10 +339,10 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
                 pageScaleFactor: 1
               }
             };
-            
+
             setLastFrame(frame);
           }
-          
+
           // Handle Page.screencastFrame (for page-level WebSocket)
           if (message.method === "Page.screencastFrame") {
             console.log("[CDP] Screencast frame received, sessionId:", message.params.sessionId);
@@ -218,6 +351,19 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
               sessionId: message.params.sessionId,
               metadata: message.params.metadata
             };
+
+            if (message.params.metadata) {
+              const metadata = message.params.metadata;
+              updateViewportMetadata({
+                deviceWidth: typeof metadata.deviceWidth === 'number' ? metadata.deviceWidth : viewportMetadataRef.current.deviceWidth,
+                deviceHeight: typeof metadata.deviceHeight === 'number' ? metadata.deviceHeight : viewportMetadataRef.current.deviceHeight,
+                pageScaleFactor: typeof metadata.pageScaleFactor === 'number' ? metadata.pageScaleFactor : viewportMetadataRef.current.pageScaleFactor,
+                offsetTop: typeof metadata.offsetTop === 'number' ? metadata.offsetTop : viewportMetadataRef.current.offsetTop,
+                offsetLeft: typeof metadata.offsetLeft === 'number' ? metadata.offsetLeft : viewportMetadataRef.current.offsetLeft,
+                scrollOffsetX: typeof metadata.scrollOffsetX === 'number' ? metadata.scrollOffsetX : viewportMetadataRef.current.scrollOffsetX,
+                scrollOffsetY: typeof metadata.scrollOffsetY === 'number' ? metadata.scrollOffsetY : viewportMetadataRef.current.scrollOffsetY
+              });
+            }
 
             setLastFrame(frame);
 
@@ -251,7 +397,7 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
   }, [wsUrl, enabled]);
 
   // Send user input events to browser
-  const sendMouseEvent = useCallback((type: 'mousePressed' | 'mouseReleased' | 'mouseMoved', x: number, y: number, button?: 'left' | 'right' | 'middle') => {
+  const sendMouseEvent = useCallback((type: 'mousePressed' | 'mouseReleased' | 'mouseMoved', canvasX: number, canvasY: number, options: CanvasPointOptions = {}) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       return;
     }
@@ -259,19 +405,14 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Convert canvas coordinates to page coordinates
-    // Use the actual image dimensions stored when rendering
     const rect = canvas.getBoundingClientRect();
-    const scaleX = imageWidthRef.current / rect.width;
-    const scaleY = imageHeightRef.current / rect.height;
-    
-    const pageX = Math.round(x * scaleX);
-    const pageY = Math.round(y * scaleY);
+    const { calibrationOffset, button } = options;
+    const { x, y } = convertCanvasPoint(canvasX, canvasY, rect, calibrationOffset);
 
     const eventParams = {
       type,
-      x: pageX,
-      y: pageY,
+      x,
+      y,
       button: button || 'left',
       clickCount: type === 'mousePressed' ? 1 : undefined
     };
@@ -395,7 +536,7 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
     }
   }, [wsUrl]);
 
-  const sendScrollEvent = useCallback((deltaX: number, deltaY: number, x: number, y: number) => {
+  const sendScrollEvent = useCallback((deltaX: number, deltaY: number, canvasX: number, canvasY: number, options: CanvasPointOptions = {}) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       return;
     }
@@ -403,21 +544,19 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Convert canvas coordinates to page coordinates
-    // Use the actual image dimensions stored when rendering
     const rect = canvas.getBoundingClientRect();
-    const scaleX = imageWidthRef.current / rect.width;
-    const scaleY = imageHeightRef.current / rect.height;
-    
-    const pageX = Math.round(x * scaleX);
-    const pageY = Math.round(y * scaleY);
+    const { x, y } = convertCanvasPoint(canvasX, canvasY, rect, options.calibrationOffset);
+
+    const viewportScale = viewportMetadataRef.current.pageScaleFactor || 1;
+    const adjustedDeltaX = deltaX / viewportScale;
+    const adjustedDeltaY = deltaY / viewportScale;
 
     const eventParams = {
       type: 'mouseWheel',
-      x: pageX,
-      y: pageY,
-      deltaX,
-      deltaY
+      x,
+      y,
+      deltaX: adjustedDeltaX,
+      deltaY: adjustedDeltaY
     };
 
     // Send to page or session depending on connection type
@@ -489,7 +628,7 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
     if (!lastFrame || !canvasRef.current) {
       return;
     }
-    
+
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) {
@@ -502,11 +641,18 @@ export function useCDPScreencast({ wsUrl, enabled }: UseCDPScreencastOptions) {
       // Store actual image dimensions for coordinate conversion
       imageWidthRef.current = img.width;
       imageHeightRef.current = img.height;
-      
+
+      if (viewportMetadataRef.current.deviceWidth === 0) {
+        updateViewportMetadata({
+          deviceWidth: img.width,
+          deviceHeight: img.height
+        });
+      }
+
       // Set canvas internal resolution to match image
       canvas.width = img.width;
       canvas.height = img.height;
-      
+
       // Draw image
       ctx.drawImage(img, 0, 0);
     };
